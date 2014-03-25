@@ -49,16 +49,30 @@ db.knex.schema.hasTable('users').then(function(exists) {
   console.log("making users schema");
   if (!exists) {
     console.log("users schema didn't exist");
-    db.knex.schema.createTable('users', function (click) {
-      click.increments('id').primary();
-      click.string('username');
-      click.string('password');
-      click.timestamps();
+    db.knex.schema.createTable('users', function (user) {
+      user.increments('id').primary();
+      user.string('username');
+      user.string('password');
+      user.timestamps();
     }).then(function (table) {
       console.log('Created Table', table);
     });
   }
 });
 
+db.knex.schema.hasTable('sessions').then(function(exists) {
+  console.log("making sessions schema");
+  if (!exists) {
+    console.log("sessions schema didn't exist");
+    db.knex.schema.createTable('sessions', function (session) {
+      session.increments('id').primary();
+      session.integer('user_id');
+      session.string('token');
+      session.string('expiration_date');
+    }).then(function (table) {
+      console.log('Created Table', table);
+    });
+  }
+});
 
 module.exports = db;

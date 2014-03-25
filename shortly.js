@@ -22,21 +22,16 @@ app.configure(function() {
   // app.use(express.cookieSession());
 });
 
-var setCookie = function(res){
-  res.cookie('A','B');
-}
-
-var cookieExists = function(req){
-  console.log('Cookie Exists: ', req.cookies);
-  return req.cookies.hasOwnProperty('A') && req.cookies.A === 'B'
-}
-
 app.get('/', function(req, res) {
-  if (cookieExists(req)){
-    res.render('index');
-  } else {
-    res.redirect('/login');
-  }
+  cookieExists(req, function(exists) {
+    if(exists) {
+      console.log("RENDERING INDEX");
+      res.render('index');
+    } else {
+      console.log("COOKIE CHECK FAILED");
+      res.redirect('/login');
+    }
+  })
 });
 
 app.get('/login', function(req, res) {
@@ -45,7 +40,8 @@ app.get('/login', function(req, res) {
 
 app.get('/logout', function(req, res) {
   console.log('Logged out');
-  res.clearCookie('A');
+  res.clearCookie('token');
+  res.clearCookie('user');
   res.redirect('/login');
 });
 
@@ -99,23 +95,75 @@ app.post('/links', function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+var setCookie = function(req, res){
+  //save cookie to session table
+  //should store cookie object and time expiration
+  //first, hash together username, password, and time requested
+  //set to cookie
+  //get current time & add 10 minutes
+  //set each to a new record
+  var currentTime = Date.now();
+  var expirationDate = currentTime + 600000;
+  var token = crypto.createHash('sha1').update(req.body.username + "" + req.body.password + "" + currentTime).digest('hex').toString();
+  db.knex('users')
+    .where('username', '=', req.body.username)
+    .select('id')
+    .then(function(uid) {
+      console.log("SELECTING IN setCookie: ", uid);
+      db.knex('sessions')
+      .insert({
+        token: token,
+        expiration_date: expirationDate,
+        user_id: uid[0].id
+      }).then(function() {
+        console.log("inserted token");
+        res.cookie('token', token);
+        res.cookie('user', req.body.username);
+        return res.redirect('/');
+      });
+    });
+}
+
+var cookieExists = function(req, callback){
+  console.log('Cookie Exists: ', req.cookies);
+  if(req.cookies.hasOwnProperty('token')) {
+    db.knex('users')
+      .where('username', '=', req.cookies.user)
+      .select('id')
+      .then(function(uid) {
+        console.log("SELECTING IN cookieExists: ", uid);
+        db.knex('sessions')
+        .where('user_id', '=', uid[0].id)
+        .andWhere('token', '=', req.cookies.token)
+        .andWhere('expiration_date', '>', Date.now())
+          .exec(function(err, sessions) {
+          console.log("sessions: ", sessions);
+          if (sessions.length >= 1){
+            console.log("COOKIE EXISTS");
+            callback(true);
+          } else {
+            console.log("NO COOKIE");
+            callback(false);
+          }
+        });
+      });
+    } else {
+      callback(false);
+    }
+}
 
 app.post('/login', function(req, res) {
 
-  var key = 'salt_from_the_user_document';
-  var cipher = crypto.createCipher('aes-256-cbc', key);
-
-  cipher.update(req.body.password, 'utf8', 'base64');
-  var encryptedPassword = cipher.final('base64');
-
+  var encryptedPassword = crypto.createHash('sha1').update(req.body.password).digest('hex').toString();
+  console.log("encryptedPassword: ", encryptedPassword);
   console.log(req.body);
   db.knex('users')
     .where('username', '=', req.body.username)
     .andWhere('password', '=', encryptedPassword)
     .exec(function(err, users) {
       if (users.length >= 1){
-        setCookie(res);
-        return res.redirect('/');
+        setCookie(req, res);
+        console.log('-------');
       } else {
         return res.redirect('/login');
       }
@@ -124,11 +172,7 @@ app.post('/login', function(req, res) {
 
 app.post('/signup', function(req, res) {
 
-  var key = 'salt_from_the_user_document';
-  var cipher = crypto.createCipher('aes-256-cbc', key);
-
-  cipher.update(req.body.password, 'utf8', 'base64');
-  var encryptedPassword = cipher.final('base64');
+  var encryptedPassword = crypto.createHash('sha1').update(req.body.password).digest('hex').toString();
 
   console.log('encrypted :', encryptedPassword);
 
@@ -140,7 +184,6 @@ app.post('/signup', function(req, res) {
       console.log("inserted username: ", JSON.stringify(req.body.username), " and password: ", encryptedPassword);
       return res.redirect('/');
     });
-  res.redirect('/');
 });
 
 
