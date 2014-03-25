@@ -53,14 +53,6 @@ app.get('/create', function(req, res) {
 });
 
 app.get('/links', function(req, res) {
-  // db.knex('user_link')
-  // .join('urls', 'urls.id', '=', 'user_link.link_id')
-  // .join('users', 'users.id', '=', 'user_link.user_id')
-  // // .where('users.username', '=', req.cookies.user)
-  // .select()
-  // .then(function(res){
-  //   console.log("/links RESPONSE: ", res, req.cookies.user);
-  // });
   db.knex('users')
     .where('username', '=', req.cookies.user)
     .select('id')
@@ -79,41 +71,45 @@ app.post('/links', function(req, res) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
   }
-  // , username: req.cookies.user 
-  new Link({ url: uri}).fetch().then(function(found) {
-    if (found) {
-      console.log("LINK FOUND ATTRIBUTES: ", found.attributes);
-      //new UserLink({link_id: found.attributes.id, user_id: }).fetch().then(function(found) {
-      res.send(200, found.attributes);
-    } else {
-      util.getUrlTitle(uri, function(err, title) {
-        if (err) {
-          console.log('Error reading URL heading: ', err);
-          return res.send(404);
-        }
-        db.knex('users')
-          .where('username', '=', req.cookies.user)
-          .select('id')
-          .then(function(uid) {
-            var link = new Link({
-              url: uri,
-              title: title,
-              base_url: req.headers.origin,
-              user_id: uid[0].id
-            });
-            link.save().then(function(newLink) {
-              Links.add(newLink);
-              res.send(200, newLink);
-            });
 
-            // var user_link = new UserLink({
-            //   user_id: uid[0].id,
-            //   // link_id: ?????
-            // });
-          })
+  db.knex('users')
+    .where('username', '=', req.cookies.user)
+    .select('id')
+    .then(function(uid) {
+
+      new Link({ url: uri, user_id: uid[0].id}).fetch().then(function(found) {
+        if (found) {
+
+          console.log("LINK FOUND ATTRIBUTES: ", found.attributes);
+          res.send(200, found.attributes);
+        }
+        else {
+
+          util.getUrlTitle(uri, function(err, title) {
+            if (err) {
+              console.log('Error reading URL heading: ', err);
+              return res.send(404);
+            }
+            db.knex('users')
+              .where('username', '=', req.cookies.user)
+              .select('id')
+              .then(function(uid) {
+                var link = new Link({
+                  url: uri,
+                  title: title,
+                  base_url: req.headers.origin,
+                  user_id: uid[0].id
+                });
+                link.save().then(function(newLink) {
+                  Links.add(newLink);
+                  res.send(200, newLink);
+                });
+              });
+
+          });
+        }
       });
-    }
-  });
+    });
 });
 
 /************************************************************/
