@@ -22,6 +22,7 @@ db.knex.schema.hasTable('urls').then(function(exists) {
       link.string('code', 100);
       link.string('title', 255);
       link.integer('visits');
+      link.integer('user_id');
       link.timestamps();
     }).then(function (table) {
       console.log('Created Table', table);
@@ -69,6 +70,21 @@ db.knex.schema.hasTable('sessions').then(function(exists) {
       session.integer('user_id');
       session.string('token');
       session.string('expiration_date');
+    }).then(function (table) {
+      console.log('Created Table', table);
+    });
+  }
+});
+
+db.knex.schema.hasTable('links_users').then(function(exists) {
+  console.log("making links users schema");
+  if (!exists) {
+    console.log("links users schema didn't exist");
+    db.knex.schema.createTable('links_users', function (user) {
+      user.increments('id').primary();
+      user.integer('user_id');
+      user.integer('link_id');
+      user.timestamps();
     }).then(function (table) {
       console.log('Created Table', table);
     });
